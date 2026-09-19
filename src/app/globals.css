@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+:root {
+  /* Combine Foundation design tokens.
+     Palette: deep teal (authority/trust) + warm paper + amber accent used
+     sparingly for time-sensitive/active states. No SaaS-card shadows —
+     panels are defined by a 1px hairline border. */
+  --paper: #f6f4ef;
+  --ink: #1e2430;
+  --ink-muted: #5b6270;
+  --teal: #17423f;
+  --teal-dark: #0f2e2b;
+  --amber: #c98a2c;
+  --amber-dark: #9a6a1c;
+  --hairline: #d8d3c6;
+  --panel: #ffffff;
+  --danger: #9a3b34;
+  --danger-bg: #f6e9e7;
+  --success: #2f6a4f;
+  --success-bg: #e8f0ea;
+
+  --font-display: var(--font-source-serif);
+  --font-body: var(--font-plex-sans);
+  --font-mono: var(--font-plex-mono);
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-teal: var(--teal);
+  --color-teal-dark: var(--teal-dark);
+  --color-amber: var(--amber);
+  --color-amber-dark: var(--amber-dark);
+  --color-hairline: var(--hairline);
+  --color-panel: var(--panel);
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
+}
+
+* {
+  border-color: var(--hairline);
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+}
+
+h1, h2, h3, .font-display {
+  font-family: var(--font-display), Georgia, serif;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border: 1px solid var(--hairline);
+  padding: 0.125rem 0.625rem;
+  font-size: 0.75rem;
+  line-height: 1.5rem;
+  color: var(--ink-muted);
+}
+
+:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
