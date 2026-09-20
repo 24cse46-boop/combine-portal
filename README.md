@@ -165,6 +165,25 @@ Section 29. The book-keeping this project asked for is otherwise done;
 what's left is mostly the deployment itself and any visual polish you want
 once it's running against real data.
 
+## Extras added after Phase 6
+
+- [x] `/admin/candidates` now has "Add one candidate" and "Bulk add" forms
+      — creates the confirmed Supabase Auth login and the `candidates` row
+      together, same pattern as the admin-onboarding form. Bulk add takes
+      one `full_name,email,phone,password[,application_id]` line per
+      candidate.
+- [x] "Generate with AI" on `/admin/questions` — give it a topic, a count,
+      a type (MCQ / short answer / mixed), and a difficulty, and it calls
+      Claude to draft questions straight into the question bank for you to
+      review/edit like any other question. Needs an `ANTHROPIC_API_KEY`
+      environment variable (get one at console.anthropic.com); without it,
+      the button just shows a clear error instead of failing silently.
+
+Known gap: a scheduled test doesn't flip to `active` on its own at
+`start_at` — an admin currently has to click "Activate now" (or schedule
+ahead of time and activate early). Automatic activation would need either
+a cron job or a check on page load; flag it if you want that built.
+
 ## Setup
 
 1. Create a Supabase project.

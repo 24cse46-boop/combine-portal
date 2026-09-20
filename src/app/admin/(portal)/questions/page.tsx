@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Button, Panel, StatusPill } from "@/components/ui";
+import { generateQuestionsWithAI } from "@/lib/actions/ai-questions";
+import { Button, ErrorNote, Field, Panel, Select, StatusPill, TextInput } from "@/components/ui";
 
-export default async function AdminQuestionsPage() {
+export default async function AdminQuestionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ai_error?: string; ai_created?: string }>;
+}) {
+  const { ai_error, ai_created } = await searchParams;
   const supabase = await createClient();
   const { data: questions } = await supabase
     .from("questions")
@@ -22,6 +28,52 @@ export default async function AdminQuestionsPage() {
           <Button>New question</Button>
         </Link>
       </div>
+
+      <ErrorNote message={ai_error} />
+      {ai_created ? (
+        <p className="border border-success bg-success-bg px-4 py-2.5 text-sm text-success mb-6">
+          {ai_created} question(s) generated and added to the bank below — review them before
+          using them on a live test.
+        </p>
+      ) : null}
+
+      <section className="mb-8">
+        <h2 className="text-sm font-medium mb-4">Generate with AI</h2>
+        <Panel className="p-6">
+          <form action={generateQuestionsWithAI} className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <Field label="Topic / instructions" htmlFor="topic">
+                <TextInput
+                  id="topic"
+                  name="topic"
+                  placeholder="e.g. teamwork and conflict resolution for volunteer coordinators"
+                  required
+                />
+              </Field>
+            </div>
+            <Field label="How many" htmlFor="count">
+              <TextInput id="count" name="count" type="number" min={1} max={20} defaultValue={5} />
+            </Field>
+            <Field label="Type" htmlFor="type">
+              <Select id="type" name="type" defaultValue="mcq">
+                <option value="mcq">Multiple choice</option>
+                <option value="short_answer">Short answer</option>
+                <option value="mixed">Mixed</option>
+              </Select>
+            </Field>
+            <Field label="Difficulty" htmlFor="difficulty">
+              <Select id="difficulty" name="difficulty" defaultValue="medium">
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+              </Select>
+            </Field>
+            <div className="flex items-end">
+              <Button type="submit">Generate</Button>
+            </div>
+          </form>
+        </Panel>
+      </section>
 
       <Panel>
         <table className="w-full text-sm">
