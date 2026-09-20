@@ -55,31 +55,44 @@ Generate ${count} ${typeInstruction}.`;
 
   let generated: GeneratedQuestion[];
   try {
-    // Google renames/retires model ids fairly often — try a short list of
-    // known-good ones in order rather than hardcoding a single name that
-    // can 404 out of nowhere.
+    // Google renames/retires model ids fairly often, and the free tier
+    // returns 503 when a model is briefly overloaded — try a short list of
+    // known-good models, and retry the whole list once after a pause if
+    // every attempt comes back overloaded.
     const modelCandidates = ["gemini-1.5-flash", "gemini-flash-latest", "gemini-2.0-flash"];
-    let res: Response | null = null;
-    let lastStatus = 0;
+    const attempt = async () => {
+      let res: Response | null = null;
+      for (const model of modelCandidates) {
+        res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: instructions }] }],
+              generationConfig: { responseMimeType: "application/json" },
+            }),
+          }
+        );
+        if (res.ok) return res;
+        if (res.status !== 404 && res.status !== 503) return res; // real error — stop
+      }
+      return res;
+    };
 
-    for (const model of modelCandidates) {
-      res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: instructions }] }],
-            generationConfig: { responseMimeType: "application/json" },
-          }),
-        }
-      );
-      if (res.ok) break;
-      lastStatus = res.status;
-      if (res.status !== 404) break; // a real error (bad key, quota) — don't keep trying
+    let res = await attempt();
+    if (res && !res.ok && res.status === 503) {
+      await new Promise((r) => setTimeout(r, 3000));
+      res = await attempt();
     }
 
-    if (!res || !res.ok) toRedirect(`AI request failed (${lastStatus || res?.status}). Check the API key.`);
+    if (!res || !res.ok) {
+      toRedirect(
+        res?.status === 503
+          ? "The AI service is busy right now (free tier). Wait a few seconds and try again."
+          : `AI request failed (${res?.status}). Check the API key.`
+      );
+    }
 
     const data = await res.json();
     const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
