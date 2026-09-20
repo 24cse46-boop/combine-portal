@@ -55,19 +55,31 @@ Generate ${count} ${typeInstruction}.`;
 
   let generated: GeneratedQuestion[];
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: instructions }] }],
-          generationConfig: { responseMimeType: "application/json" },
-        }),
-      }
-    );
+    // Google renames/retires model ids fairly often — try a short list of
+    // known-good ones in order rather than hardcoding a single name that
+    // can 404 out of nowhere.
+    const modelCandidates = ["gemini-1.5-flash", "gemini-flash-latest", "gemini-2.0-flash"];
+    let res: Response | null = null;
+    let lastStatus = 0;
 
-    if (!res.ok) toRedirect(`AI request failed (${res.status}). Check the API key.`);
+    for (const model of modelCandidates) {
+      res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: instructions }] }],
+            generationConfig: { responseMimeType: "application/json" },
+          }),
+        }
+      );
+      if (res.ok) break;
+      lastStatus = res.status;
+      if (res.status !== 404) break; // a real error (bad key, quota) — don't keep trying
+    }
+
+    if (!res || !res.ok) toRedirect(`AI request failed (${lastStatus || res?.status}). Check the API key.`);
 
     const data = await res.json();
     const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
