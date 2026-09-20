@@ -17,18 +17,19 @@ type GeneratedQuestion = {
 };
 
 /**
- * Calls Claude to draft a batch of questions on a topic, then inserts them
- * directly into the shared question bank (same tables/shape as a manually
- * created question — nothing about how they're graded or attached to a
- * test is any different). Admins review/edit/delete them like any other
- * question afterwards; nothing is shown to candidates until an admin
- * explicitly adds it to a test.
+ * Calls Google's Gemini API (free tier — no credit card required, see
+ * https://aistudio.google.com/apikey) to draft a batch of questions on a
+ * topic, then inserts them directly into the shared question bank (same
+ * tables/shape as a manually created question — nothing about how
+ * they're graded or attached to a test is any different). Admins
+ * review/edit/delete them like any other question afterwards; nothing is
+ * shown to candidates until an admin explicitly adds it to a test.
  */
 export async function generateQuestionsWithAI(formData: FormData) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     toRedirect(
-      "AI question generation isn't configured — ask whoever manages deployment to add an ANTHROPIC_API_KEY environment variable."
+      "AI question generation isn't configured — ask whoever manages deployment to add a GEMINI_API_KEY environment variable (free at aistudio.google.com/apikey)."
     );
   }
 
@@ -46,42 +47,40 @@ export async function generateQuestionsWithAI(formData: FormData) {
         ? "multiple-choice questions, each with exactly 4 options and exactly one correct option"
         : "short-answer questions (no options — open-ended, graded by a human later)";
 
-  const systemPrompt = `You write assessment questions for a volunteer program's screening test. Return ONLY a JSON array, no prose, no markdown fences. Each element: {"type":"mcq"|"short_answer","prompt":string,"marks":number,"time_seconds":number,"options":[{"text":string,"correct":boolean}] (omit "options" for short_answer)}. Exactly one option must have "correct": true for every mcq. Keep prompts clear and unambiguous.`;
+  const instructions = `You write assessment questions for a volunteer program's screening test. Return ONLY a JSON array, no prose. Each element: {"type":"mcq"|"short_answer","prompt":string,"marks":number,"time_seconds":number,"options":[{"text":string,"correct":boolean}] (omit "options" for short_answer)}. Exactly one option must have "correct": true for every mcq. Keep prompts clear and unambiguous.
 
-  const userPrompt = `Topic: ${topic}\nDifficulty: ${difficulty}\nGenerate ${count} ${typeInstruction}.`;
+Topic: ${topic}
+Difficulty: ${difficulty}
+Generate ${count} ${typeInstruction}.`;
 
   let generated: GeneratedQuestion[];
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 4000,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
-      }),
-    });
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: instructions }] }],
+          generationConfig: { responseMimeType: "application/json" },
+        }),
+      }
+    );
 
     if (!res.ok) toRedirect(`AI request failed (${res.status}). Check the API key.`);
 
     const data = await res.json();
-    const text = (data.content ?? [])
-      .filter((b: { type: string }) => b.type === "text")
-      .map((b: { text: string }) => b.text)
-      .join("\n")
-      .trim()
-      .replace(/^```(?:json)?/i, "")
-      .replace(/```$/, "")
-      .trim();
+    const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) toRedirect("The AI returned an empty response. Try again.");
 
-    generated = JSON.parse(text);
+    generated = JSON.parse(text as string);
     if (!Array.isArray(generated)) throw new Error("not an array");
-  } catch {
+  } catch (err) {
+    // redirect() throws internally to unwind — let that pass through
+    // instead of being swallowed into the generic message below.
+    if (err && typeof err === "object" && "digest" in err && String(err.digest).startsWith("NEXT_REDIRECT")) {
+      throw err;
+    }
     toRedirect("Could not parse the AI's response. Try again, or lower the question count.");
   }
 
